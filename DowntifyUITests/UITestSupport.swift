@@ -21,11 +21,13 @@ enum DowntifyUITestSupport {
 
     /// Launches the app in harness mode. Staging values come from the test runner environment only.
     static func launch(faults: [String] = [], staging: Bool = false, fixtureTracks: Int? = nil,
-                       fixtureLyrics: String? = nil, fixtureSimilar: String? = nil) -> XCUIApplication {
+                       fixtureLyrics: String? = nil, fixtureSimilar: String? = nil,
+                       fixtureReadyDownloads: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         var arguments = ["-DowntifyHarness"]
         if staging { arguments += ["-DowntifyHarnessMode", "staging"] }
         if let fixtureTracks { arguments += ["-DowntifyFixtureTracks", String(fixtureTracks)] }
+        if fixtureReadyDownloads { arguments.append("-DowntifyFixtureReadyDownloads") }
         if let fixtureLyrics { arguments += ["-DowntifyFixtureLyrics", fixtureLyrics] }
         if let fixtureSimilar { arguments += ["-DowntifyFixtureSimilar", fixtureSimilar] }
         for fault in faults { arguments += ["-DowntifyFault", fault] }

@@ -16,13 +16,15 @@ private struct AppEnvironment {
         #if DEBUG
         if let harness = DebugHarness.current {
             try? harness.resetDirectories()
+            let offlineDirectory = harness.cachesDirectory.appending(path: "Offline", directoryHint: .isDirectory)
+            try? harness.seedReadyDownloads(in: offlineDirectory)
             let defaults = harness.makeDefaults()
             NetworkOperationCoordinator.shared = NetworkOperationCoordinator(
                 limit: NetworkOperationCoordinator.savedLimit(in: defaults), defaults: defaults)
             return AppEnvironment(
                 defaults: defaults, transport: harness.makeTransport(), sessionStore: harness.makeSessionStore(),
                 databaseURL: harness.databaseURL,
-                offlineDirectory: harness.cachesDirectory.appending(path: "Offline", directoryHint: .isDirectory),
+                offlineDirectory: offlineDirectory,
                 preloadDirectory: harness.cachesDirectory.appending(path: "PlaybackPreload", directoryHint: .isDirectory),
                 outboxRoot: harness.cachesDirectory.appending(path: "PlaybackListens", directoryHint: .isDirectory),
                 streamResolver: harness.makeStreamResolver())
