@@ -90,6 +90,50 @@ final class DebugHarnessUITests: XCTestCase {
         XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 15) { $0.artworkLoaded })
     }
 
+    /// Issue 97: ready download rows play independently from their actions menus.
+    func testReadyDownloadRowsPlayAndKeepMenuIndependent() throws {
+        let app = DowntifyUITestSupport.launch(fixtureReadyDownloads: true)
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.sessionActive && $0.libraryTrackCount == 2
+        })
+
+        let downloaded = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Downloaded to this device")).firstMatch
+        XCTAssertTrue(downloaded.waitForExistence(timeout: 15))
+        downloaded.tap()
+
+        let first = app.buttons["downloads.play.fixture-track-1"]
+        let second = app.buttons["downloads.play.fixture-track-2"]
+        XCTAssertTrue(first.waitForExistence(timeout: 15))
+        XCTAssertTrue(second.waitForExistence(timeout: 15))
+        XCTAssertTrue(first.label.contains("Fixture One"))
+        XCTAssertTrue(second.label.contains("Fixture Two"))
+
+        first.tap()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.currentTrackID == "fixture-track-1" && $0.playbackPhase == "playing" &&
+            $0.queueTrackIDs == ["fixture-track-1"]
+        })
+        second.tap()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.currentTrackID == "fixture-track-2" && $0.playbackPhase == "playing" &&
+            $0.queueTrackIDs == ["fixture-track-2"]
+        })
+
+        let firstActions = app.buttons["downloads.actions.fixture-track-1"]
+        XCTAssertTrue(firstActions.waitForExistence(timeout: 10))
+        firstActions.tap()
+        let play = app.buttons["Play"].firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 10))
+        let whileMenuOpen = DowntifyUITestSupport.state(of: app)
+        XCTAssertEqual(whileMenuOpen?.currentTrackID, "fixture-track-2")
+        XCTAssertEqual(whileMenuOpen?.queueTrackIDs, ["fixture-track-2"])
+        play.tap()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.currentTrackID == "fixture-track-1" && $0.playbackPhase == "playing" &&
+            $0.queueTrackIDs == ["fixture-track-1"]
+        })
+    }
+
     /// Scenario 2: controlled failure. A stream fault must surface as a failed phase with an error code.
     func testInjectedStreamFaultReportsFailure() throws {
         let app = DowntifyUITestSupport.launch(faults: ["stream=http500"])

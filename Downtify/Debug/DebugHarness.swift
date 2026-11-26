@@ -57,6 +57,8 @@ struct DebugHarnessConfiguration: Equatable {
     let faults: [DebugRoute: DebugFaultKind]
     /// Number of generated fixture library tracks (`-DowntifyFixtureTracks <n>`, 2...12, default 2).
     var fixtureTrackCount: Int = 2
+    /// Seeds two ready downloads for UI-only fixture playback when explicitly requested.
+    var fixtureReadyDownloads = false
     /// Set when staging configuration is invalid. The harness then refuses all network traffic (fail closed).
     let configurationError: DebugHarnessError?
     /// `-DowntifyFixtureLyrics none|synced|plain|both|error`. `none` (default) keeps the lyrics capability off.
@@ -90,6 +92,7 @@ struct DebugHarnessConfiguration: Equatable {
                 fixture.fixtureLyrics = lyrics
             }
             fixture.fixtureSimilar = value(after: "-DowntifyFixtureSimilar", in: arguments).flatMap(parseFixtureSimilar)
+            fixture.fixtureReadyDownloads = arguments.contains("-DowntifyFixtureReadyDownloads")
             return fixture
         }
         do {
@@ -301,7 +304,42 @@ struct DebugHarness {
         }
     }
 
-    func makeSessionStore() -> any DeviceSessionStoring { DebugMemorySessionStore() }
+    func makeSessionStore() -> any DeviceSessionStoring {
+        let store = DebugMemorySessionStore()
+        if configuration.mode == .fixture && configuration.fixtureReadyDownloads {
+            try? store.save(Self.fixtureSession)
+        }
+        return store
+    }
+
+    private static let fixtureSession = DeviceSession(
+        baseAddress: "https://fixture.test", serverID: "fixture-server", serverName: "Fixture",
+        deviceID: "fixture-device", username: "fixture", role: "admin", token: "fixture-token",
+        allowsInsecureHTTP: false)
+
+    /// The debug resolver supplies silent audio; these files only make the manifest internally consistent.
+    func seedReadyDownloads(in directory: URL) throws {
+        guard configuration.mode == .fixture, configuration.fixtureReadyDownloads else { return }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let records = try (1...2).map { number in
+            let title = number == 1 ? "Fixture One" : "Fixture Two"
+            let track = LibraryTrack(id: "fixture-track-\(number)", file: "track\(number).wav", title: title,
+                                     artist: "Fixture Artist", artists: ["Fixture Artist"], album: "Fixture Album",
+                                     albumArtist: "Fixture Artist", albumID: "fixture-album", artistID: "fixture-artist",
+                                     trackNumber: number, year: "2026", duration: 30, codec: "wav", bitrate: 64000,
+                                     sampleRate: 8000, channels: 1, size: 240044, added: Int64(number),
+                                     hasCover: true, isExplicit: false, playlists: [])
+            let id = UUID()
+            let bytes = Data([0])
+            try bytes.write(to: directory.appendingPathComponent(id.uuidString).appendingPathExtension("wav"))
+            return OfflineDownload(id: id, track: track, scope: .init(Self.fixtureSession), requestedQuality: .original,
+                                   state: .ready, media: OfflineMedia(length: Int64(bytes.count), mime: "audio/wav",
+                                                                     type: "audio/wav", fileExtension: "wav",
+                                                                     etag: nil, quality: .original),
+                                   receivedBytes: Int64(bytes.count))
+        }
+        try JSONEncoder().encode(records).write(to: directory.appendingPathComponent("downloads.json"), options: .atomic)
+    }
 
     func makeStreamResolver() -> any PlaybackStreamResolving {
         DebugPlaybackStreamResolver(directory: rootDirectory.appendingPathComponent("media", isDirectory: true),
