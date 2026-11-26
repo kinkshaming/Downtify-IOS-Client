@@ -651,3 +651,12 @@
 "instrumental break" = "hangszeres rész";
 "Loading more…" = "Továbbiak betöltése…";
 "No more similar tracks" = "Nincs több hasonló szám";
+
+/* Now Playing library requests */
+"This song cannot be requested from the catalog." = "Ez a dal nem kérhető a katalógusból.";
+"Provider information is unavailable for this song." = "Ehhez a dalhoz nem érhetők el szolgáltatói adatok.";
+"Catalog requests are unavailable on this server." = "Ezen a szerveren nem érhetők el katalóguskérések.";
+"Requested for Library" = "Kérve a könyvtárhoz";
+"%@ was requested for your Library" = "A(z) %@ hozzáadása kérve a könyvtáradhoz";
+"The song will appear after library sync." = "A dal a könyvtár szinkronizálása után jelenik meg.";
+"Check Library requests for the current status." = "Az aktuális állapotért ellenőrizd a könyvtári kéréseket.";

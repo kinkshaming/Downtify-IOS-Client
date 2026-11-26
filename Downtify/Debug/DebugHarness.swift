@@ -59,6 +59,8 @@ struct DebugHarnessConfiguration: Equatable {
     var fixtureTrackCount: Int = 2
     /// Seeds two ready downloads for UI-only fixture playback when explicitly requested.
     var fixtureReadyDownloads = false
+    /// Allows an opt-in catalog request to appear in the next library feed.
+    var fixtureLibraryRequest = false
     /// Set when staging configuration is invalid. The harness then refuses all network traffic (fail closed).
     let configurationError: DebugHarnessError?
     /// `-DowntifyFixtureLyrics none|synced|plain|both|error`. `none` (default) keeps the lyrics capability off.
@@ -93,6 +95,7 @@ struct DebugHarnessConfiguration: Equatable {
             }
             fixture.fixtureSimilar = value(after: "-DowntifyFixtureSimilar", in: arguments).flatMap(parseFixtureSimilar)
             fixture.fixtureReadyDownloads = arguments.contains("-DowntifyFixtureReadyDownloads")
+            fixture.fixtureLibraryRequest = arguments.contains("-DowntifyFixtureLibraryRequest")
             return fixture
         }
         do {
@@ -299,7 +302,8 @@ struct DebugHarness {
     func makeTransport() -> any HTTPDataLoading {
         switch configuration.mode {
         case .fixture: return DebugFixtureTransport(faults: configuration.faults, trackCount: configuration.fixtureTrackCount,
-                                                    lyrics: configuration.fixtureLyrics, similar: configuration.fixtureSimilar)
+                                                    lyrics: configuration.fixtureLyrics, similar: configuration.fixtureSimilar,
+                                                    libraryRequest: configuration.fixtureLibraryRequest)
         case .staging: return DebugGuardedTransport(configuration: configuration)
         }
     }
