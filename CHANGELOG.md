@@ -4,6 +4,13 @@ Historical record of Downtify iOS releases (version 0.1.2), newest first. Each b
 
 Builds 0.1.2-7 and earlier predate the curated release notes; their entries are reconstructed from git history.
 
+## Unreleased — 0.1.2-14 branch
+
+Changes:
+- Play a ready download by tapping its row; its separate actions menu keeps Play and device-management controls (#97)
+- Request Add to Library for eligible catalog songs directly from Now Playing; show request status and enable library-dependent actions after library sync confirms the song (#100)
+- Localize the new Now Playing library-request messages and add fixture coverage for Downloads row playback and library-request states (#97, #100)
+
 ## 0.1.2 (14) — 2026-11-25
 
 Release notes:
