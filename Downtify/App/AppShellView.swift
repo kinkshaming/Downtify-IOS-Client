@@ -253,11 +253,12 @@ extension EnvironmentValues {
 
 private struct NowPlayingView: View {
     @ObservedObject var playback: PlaybackController
-    let library: LibraryPresentationModel
-    let serverDownloads: ServerDownloadPresentationModel
+    @ObservedObject var library: LibraryPresentationModel
+    @ObservedObject var serverDownloads: ServerDownloadPresentationModel
     @State private var path: [NowPlayingRoute] = []
     @State private var artistChoices: [NowPlayingArtistTarget] = []
     @EnvironmentObject private var collections: LibraryCollectionsModel
+    @EnvironmentObject private var catalog: CatalogPresentationModel
     @EnvironmentObject private var artworkLoader: ArtworkLoader
     @State private var artworkTint: Color?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -624,12 +625,22 @@ private struct NowPlayingView: View {
             busy: collections.mutationBusy)
     }
 
+    private var libraryPresentation: MediaActionPresentation? {
+        guard let song = item?.catalogSong else { return nil }
+        return NowPlayingLibraryPresentation.make(
+            song: song, isInLibrary: actionTrack != nil,
+            externalCatalogAvailable: catalog.externalCatalogAvailable,
+            hasSession: serverDownloads.session != nil,
+            state: serverDownloads.actionState(for: song))
+    }
+
     /// Labeled actions so Like, Add to Playlist and the queue are visible without guessing at icons.
     private var actionRow: some View {
         let like = likePresentation
         let playlist = playlistPresentation
+        let libraryAction = libraryPresentation
         var explanations: [String] = []
-        for explanation in [like.explanation, playlist.explanation].compactMap({ $0 }) where !explanations.contains(explanation) {
+        for explanation in [like.explanation, playlist.explanation, libraryAction?.explanation].compactMap({ $0 }) where !explanations.contains(explanation) {
             explanations.append(explanation)
         }
         return VStack(spacing: DowntifyStyle.Space.small) {
@@ -659,6 +670,17 @@ private struct NowPlayingView: View {
                 }
                 .accessibilityHint("Open queue")
                 .accessibilityIdentifier("player.queue")
+            }
+            if let libraryAction, let song = item?.catalogSong {
+                NowPlayingActionButton(title: libraryAction.title,
+                                       systemImage: libraryAction.systemImage ?? "hourglass") {
+                    guard item?.catalogSong?.id == song.id, libraryPresentation?.isEnabled == true else { return }
+                    Task { await serverDownloads.request(song: song) }
+                }
+                .disabled(!libraryAction.isEnabled)
+                .accessibilityLabel(Text(verbatim: libraryAction.accessibilityLabel))
+                .accessibilityHint(Text(verbatim: libraryAction.explanation ?? ""))
+                .accessibilityIdentifier("player.addToLibrary")
             }
             if !explanations.isEmpty {
                 Text(verbatim: explanations.joined(separator: " · "))

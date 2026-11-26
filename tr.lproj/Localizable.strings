@@ -695,3 +695,12 @@
 "instrumental break" = "enstrümantal bölüm";
 "Loading more…" = "Daha fazlası yükleniyor…";
 "No more similar tracks" = "Başka benzer şarkı yok";
+
+/* Now Playing library requests */
+"This song cannot be requested from the catalog." = "Bu şarkı katalogdan istenemiyor.";
+"Provider information is unavailable for this song." = "Bu şarkı için sağlayıcı bilgileri kullanılamıyor.";
+"Catalog requests are unavailable on this server." = "Bu sunucuda katalog istekleri kullanılamıyor.";
+"Requested for Library" = "Kitaplık için istendi";
+"%@ was requested for your Library" = "%@ kitaplığınız için istendi";
+"The song will appear after library sync." = "Şarkı, kitaplık eşzamanlandıktan sonra görünecek.";
+"Check Library requests for the current status." = "Güncel durum için kitaplık isteklerini kontrol edin.";

@@ -103,7 +103,7 @@ struct AppContainer {
             offlineDownloads = .live
         }
         offlineDownloads.verifySession = verifyPlaybackSession
-        let serverDownloadQueue = ServerDownloadQueue(verifySession: verifyPlaybackSession)
+        let serverDownloadQueue = ServerDownloadQueue(transport: environment.transport, verifySession: verifyPlaybackSession)
         self.serverDownloadQueue = serverDownloadQueue
         let serverDownloads = ServerDownloadPresentationModel(queue: serverDownloadQueue, sessionUpdates: sessionUpdates)
         self.serverDownloads = serverDownloads

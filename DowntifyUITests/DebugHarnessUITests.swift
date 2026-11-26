@@ -244,6 +244,99 @@ final class DebugHarnessUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Next track"].firstMatch.isEnabled)
     }
 
+    /// Issue 100: the catalog song has a direct server-library action in Now Playing.
+    func testCatalogNowPlayingOffersLibraryRequestAndFailureRetry() throws {
+        let app = DowntifyUITestSupport.launch()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.sessionActive && $0.libraryTrackCount == 2
+        })
+        let search = app.buttons["Search"].firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        search.tap()
+        let field = app.textFields["catalog.searchField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        field.typeText("Fixture Catalog\n")
+
+        let result = app.buttons["catalog.result.youtube:fixture-song-1"]
+        XCTAssertTrue(result.waitForExistence(timeout: 15))
+        result.tap()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) { $0.playbackPhase == "playing" })
+        let dock = DowntifyUITestSupport.element(app, "player.dock")
+        XCTAssertTrue(dock.waitForExistence(timeout: 10))
+        dock.tap()
+
+        let add = app.buttons["player.addToLibrary"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForEnabled(add))
+        XCTAssertEqual(add.label, "Add Fixture Catalog Song to Library")
+        XCTAssertFalse(app.buttons["player.like"].isEnabled)
+        XCTAssertFalse(app.buttons["player.addToPlaylist"].isEnabled)
+
+        // The fixture returns 404 for the request; this tests the visible failure path,
+        // not a successful server queue or library sync.
+        add.tap()
+        XCTAssertTrue(waitForLabel(of: add, toBe: "Retry adding Fixture Catalog Song to Library"),
+                      "request action label: \(add.label)")
+        XCTAssertTrue(add.isEnabled)
+        XCTAssertFalse(app.buttons["player.like"].isEnabled)
+        XCTAssertFalse(app.buttons["player.addToPlaylist"].isEnabled)
+    }
+
+    /// Issue 100: a queued server request becomes owned only after a library refresh.
+    func testCatalogNowPlayingRequestEnablesActionsAfterLibrarySync() throws {
+        let app = DowntifyUITestSupport.launch(fixtureLibraryRequest: true)
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.sessionActive && $0.libraryTrackCount == 2
+        })
+        let search = app.buttons["Search"].firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        search.tap()
+        let field = app.textFields["catalog.searchField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        field.typeText("Fixture Catalog\n")
+        let result = app.buttons["catalog.result.youtube:fixture-song-1"]
+        XCTAssertTrue(result.waitForExistence(timeout: 15))
+        result.tap()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) { $0.playbackPhase == "playing" })
+        let dock = DowntifyUITestSupport.element(app, "player.dock")
+        XCTAssertTrue(dock.waitForExistence(timeout: 10))
+        dock.tap()
+
+        let add = app.buttons["player.addToLibrary"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForEnabled(add))
+        add.tap()
+        XCTAssertTrue(waitForLabel(of: add, toBe: "Fixture Catalog Song is queued for your Library"),
+                      "request action label: \(add.label)")
+        XCTAssertFalse(add.isEnabled)
+        XCTAssertFalse(app.buttons["player.like"].isEnabled)
+        XCTAssertFalse(app.buttons["player.addToPlaylist"].isEnabled)
+
+        // The fixture changes its library feed after accepting the request. Trigger
+        // the same refresh a listener can use rather than treating queueing as ownership.
+        app.navigationBars["Now Playing"].buttons["Done"].tap()
+        DowntifyUITestSupport.element(app, "tab.library").tap()
+        let account = app.buttons["Account options"].firstMatch
+        XCTAssertTrue(account.waitForExistence(timeout: 10))
+        account.tap()
+        let refresh = app.buttons["Refresh library"].firstMatch
+        XCTAssertTrue(refresh.waitForExistence(timeout: 10))
+        refresh.tap()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) { $0.libraryTrackCount == 3 })
+
+        let refreshedDock = DowntifyUITestSupport.element(app, "player.dock")
+        XCTAssertTrue(refreshedDock.waitForExistence(timeout: 10))
+        refreshedDock.tap()
+        let owned = app.buttons["player.addToLibrary"]
+        XCTAssertTrue(waitForLabel(of: owned, toBe: "Fixture Catalog Song is in your Library"),
+                      "library action label: \(owned.label)")
+        XCTAssertFalse(owned.isEnabled)
+        XCTAssertTrue(waitForEnabled(app.buttons["player.like"]))
+        XCTAssertTrue(waitForEnabled(app.buttons["player.addToPlaylist"]))
+    }
+
     private func waitForEnabled(_ element: XCUIElement, timeout: TimeInterval = 15) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {

@@ -44,6 +44,64 @@ final class MediaActionTests: XCTestCase {
         XCTAssertNil(MediaActionPresentation.library(.submitting, itemTitle: title).systemImage)
     }
 
+    func testNowPlayingLibraryRequestStatesDistinguishRequestFromMembership() throws {
+        let song = try catalogSong()
+        let cases: [(ServerDownloadActionState, String, Bool, String?)] = [
+            (.idle, "Add to Library", true, nil),
+            (.submitting, "Adding to Library", false, nil),
+            (.queued(jobID: "job"), "Queued for Library", false, nil),
+            (.accepted, "Requested for Library", false, "The song will appear after library sync."),
+            (.partiallyAccepted(successful: 1, expected: 2), "Library status unknown", false,
+             "Check Library requests for the current status."),
+            (.outcomeUnknown, "Library status unknown", false, nil),
+            (.failed("Network down"), "Retry Add to Library", true, "Network down"),
+        ]
+        for (state, expectedTitle, enabled, explanation) in cases {
+            let action = NowPlayingLibraryPresentation.make(song: song, isInLibrary: false,
+                externalCatalogAvailable: true, hasSession: true, state: state)
+            XCTAssertEqual(action.title, expectedTitle, "\(state)")
+            XCTAssertEqual(action.isEnabled, enabled, "\(state)")
+            XCTAssertEqual(action.explanation, explanation, "\(state)")
+            XCTAssertTrue(action.accessibilityLabel.contains(title), "\(state): \(action.accessibilityLabel)")
+            XCTAssertNotEqual(action.title, "In Library", "\(state) is not membership")
+        }
+    }
+
+    func testNowPlayingLibraryRequestRequiresEligibleSongAndConnection() throws {
+        let song = try catalogSong()
+        let librarySong = try catalogSong(source: "library")
+        let missingURL = try catalogSong(url: "")
+        let whitespaceURL = try catalogSong(url: "   ")
+        let cases: [(CatalogSong?, Bool, Bool, String)] = [
+            (nil, true, true, "This song cannot be requested from the catalog."),
+            (librarySong, true, true, "This song cannot be requested from the catalog."),
+            (missingURL, true, true, "Provider information is unavailable for this song."),
+            (whitespaceURL, true, true, "Provider information is unavailable for this song."),
+            (song, false, true, "Catalog requests are unavailable on this server."),
+            (song, true, false, "Reconnect to add to your Library."),
+        ]
+        for (item, catalogAvailable, hasSession, explanation) in cases {
+            for state in [ServerDownloadActionState.idle, .failed("Network down")] {
+                let action = NowPlayingLibraryPresentation.make(song: item, isInLibrary: false,
+                    externalCatalogAvailable: catalogAvailable, hasSession: hasSession, state: state)
+                XCTAssertFalse(action.isEnabled, "\(explanation): \(state)")
+                XCTAssertEqual(action.explanation, explanation)
+                XCTAssertTrue(action.accessibilityLabel.contains(item?.title ?? "Unknown title"))
+            }
+        }
+    }
+
+    func testNowPlayingConfirmedMembershipSupersedesRequestAndAvailability() throws {
+        let song = try catalogSong()
+        for state in libraryStates {
+            let action = NowPlayingLibraryPresentation.make(song: song, isInLibrary: true,
+                externalCatalogAvailable: false, hasSession: false, state: state)
+            XCTAssertEqual(action.title, "In Library", "\(state)")
+            XCTAssertEqual(action.accessibilityLabel, "\(title) is in your Library")
+            XCTAssertFalse(action.isEnabled, "\(state)")
+        }
+    }
+
     func testDevicePresentationForEveryState() {
         let cases: [(DeviceSaveState, String, String?, Bool, String?)] = [
             (.unavailable(.notInLibrary), "Add to Device", "iphone.slash", false, "Add to Library first"),
@@ -127,6 +185,12 @@ final class MediaActionTests: XCTestCase {
     }
 
     // MARK: - Fixtures
+
+    private func catalogSong(source: String = "youtube", url: String = "https://music.youtube.com/watch?v=test") throws -> CatalogSong {
+        let payload: [String: String] = ["source": source, "song_id": "test", "name": title,
+                                         "artist": "Artist", "url": url]
+        return try JSONDecoder().decode(CatalogSong.self, from: JSONSerialization.data(withJSONObject: payload))
+    }
 
     private var libraryStates: [ServerDownloadActionState] {
         [

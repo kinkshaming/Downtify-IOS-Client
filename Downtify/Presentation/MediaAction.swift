@@ -108,6 +108,51 @@ struct MediaActionPresentation: Equatable {
     }
 }
 
+/// Request state for the current player item. Server acceptance is not library membership.
+enum NowPlayingLibraryPresentation {
+    static func make(song: CatalogSong?, isInLibrary: Bool, externalCatalogAvailable: Bool,
+                     hasSession: Bool, state: ServerDownloadActionState) -> MediaActionPresentation {
+        let title = song?.title ?? String(localized: "Unknown title")
+        if isInLibrary {
+            return .library(.accepted, itemTitle: title)
+        }
+
+        let unavailableReason: String?
+        if song == nil || song?.source == "library" {
+            unavailableReason = String(localized: "This song cannot be requested from the catalog.")
+        } else if song?.url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
+            unavailableReason = String(localized: "Provider information is unavailable for this song.")
+        } else if !hasSession {
+            unavailableReason = String(localized: "Reconnect to add to your Library.")
+        } else if !externalCatalogAvailable {
+            unavailableReason = String(localized: "Catalog requests are unavailable on this server.")
+        } else {
+            unavailableReason = nil
+        }
+
+        if let unavailableReason {
+            return MediaActionPresentation(title: String(localized: "Add to Library"), systemImage: "plus.circle",
+                                           accessibilityLabel: String(localized: "Add \(title) to Library"),
+                                           isEnabled: false, explanation: unavailableReason)
+        }
+
+        switch state {
+        case .accepted:
+            return MediaActionPresentation(title: String(localized: "Requested for Library"), systemImage: "clock.arrow.circlepath",
+                                           accessibilityLabel: String(localized: "\(title) was requested for your Library"),
+                                           isEnabled: false,
+                                           explanation: String(localized: "The song will appear after library sync."))
+        case .partiallyAccepted:
+            return MediaActionPresentation(title: String(localized: "Library status unknown"), systemImage: "questionmark.circle",
+                                           accessibilityLabel: String(localized: "Library status unknown for \(title)"),
+                                           isEnabled: false,
+                                           explanation: String(localized: "Check Library requests for the current status."))
+        default:
+            return .library(state, itemTitle: title)
+        }
+    }
+}
+
 struct MediaActionButton: View {
     enum Style { case icon, label }
     let presentation: MediaActionPresentation
