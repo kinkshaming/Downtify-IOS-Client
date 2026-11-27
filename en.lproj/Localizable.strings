@@ -204,6 +204,7 @@
 "Shared with me" = "Shared with me";
 "Showing saved music." = "Showing saved music.";
 "Shuffle" = "Shuffle";
+"Shuffle Library" = "Shuffle Library";
 "Shuffle songs" = "Shuffle songs";
 "Sign in to play this track" = "Sign in to play this track";
 "Sign in with password" = "Sign in with password";
@@ -649,3 +650,12 @@
 "instrumental break" = "instrumental break";
 "Loading more…" = "Loading more…";
 "No more similar tracks" = "No more similar tracks";
+
+/* Now Playing library requests */
+"This song cannot be requested from the catalog." = "This song cannot be requested from the catalog.";
+"Provider information is unavailable for this song." = "Provider information is unavailable for this song.";
+"Catalog requests are unavailable on this server." = "Catalog requests are unavailable on this server.";
+"Requested for Library" = "Requested for Library";
+"%@ was requested for your Library" = "%@ was requested for your Library";
+"The song will appear after library sync." = "The song will appear after library sync.";
+"Check Library requests for the current status." = "Check Library requests for the current status.";

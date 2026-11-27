@@ -234,6 +234,13 @@ The bundled files are in [`themes/`](../themes). When a bundled theme is updated
 
 ## Testing a theme
 
+Now Playing adapts its placement to the available sheet size for every theme. Narrow windows stack
+the artwork above the controls; sufficiently wide sheets put them side by side.
+Accessibility text sizes use the stacked layout. The artwork is bounded by the available width,
+so a theme does not need separate coordinates for each device.
+On iPad, opening Now Playing in a sufficiently wide window shows it beside the main app. In a
+narrow window it opens as a sheet, as it does on iPhone.
+
 On a device, import the file from Files.
 
 In the iOS Simulator you can apply a theme without the file picker by writing it straight into the app's saved settings, then relaunching:

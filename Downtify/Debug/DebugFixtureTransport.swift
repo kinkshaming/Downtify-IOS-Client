@@ -12,18 +12,22 @@ final class DebugFixtureTransport: HTTPDataLoading, @unchecked Sendable {
     private let lock = NSLock()
     private var likedIDs: [String] = []
     private var playlistTrackIDs: [String] = []
+    private var catalogRequested = false
 
     private let trackCount: Int
     private let lyrics: DebugHarnessConfiguration.FixtureLyrics
     private let similar: DebugHarnessConfiguration.FixtureSimilar?
+    private let libraryRequest: Bool
     private var failedSimilarPage = false
 
     init(faults: [DebugRoute: DebugFaultKind], trackCount: Int = 2,
-         lyrics: DebugHarnessConfiguration.FixtureLyrics = .none, similar: DebugHarnessConfiguration.FixtureSimilar? = nil) {
+         lyrics: DebugHarnessConfiguration.FixtureLyrics = .none, similar: DebugHarnessConfiguration.FixtureSimilar? = nil,
+         libraryRequest: Bool = false) {
         self.trackCount = trackCount
         self.faults = faults
         self.lyrics = lyrics
         self.similar = similar
+        self.libraryRequest = libraryRequest
     }
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
@@ -59,7 +63,19 @@ final class DebugFixtureTransport: HTTPDataLoading, @unchecked Sendable {
         case ("GET", "/api/auth/status"):
             return respond(url, 200, #"{"via":"device","signed_in":true}"#)
         case ("GET", "/api/v1/library"):
-            return respond(url, 200, Self.libraryPage(trackCount: trackCount), headers: ["ETag": "\"fixture-1\""])
+            let includesCatalog = libraryRequest && withLock { catalogRequested }
+            return respond(url, 200, Self.libraryPage(trackCount: trackCount, includesCatalog: includesCatalog),
+                           headers: ["ETag": includesCatalog ? "\"fixture-2\"" : "\"fixture-1\""])
+        case ("POST", "/api/download/url") where libraryRequest:
+            guard let song = decode(body), song["song_id"] as? String == "fixture-song-1" else {
+                return respond(url, 400, #"{"detail":"unexpected fixture song"}"#)
+            }
+            withLock { catalogRequested = true }
+            return respond(url, 200, #""fixture-job-1""#)
+        case ("GET", "/api/queue") where libraryRequest:
+            return respond(url, 200, "[]")
+        case ("GET", "/api/queue/state") where libraryRequest:
+            return respond(url, 200, #"{"paused":false,"state":"idle","active":0}"#)
         case ("GET", "/api/v1/playlists"):
             return respond(url, 200, playlistsJSON())
         case ("GET", "/api/v1/likes"):
@@ -266,12 +282,13 @@ final class DebugFixtureTransport: HTTPDataLoading, @unchecked Sendable {
     static let authResponse = #"{"token":"fixture-token","device":{"id":"fixture-device"},"server":{"server_id":"fixture-server","name":"Fixture"},"user":{"username":"fixture","role":"admin"}}"#
 
     /// Library page with `trackCount` generated tracks `fixture-track-1...n` (title "Fixture One", "Fixture Two", ...).
-    static func libraryPage(trackCount: Int) -> String {
+    static func libraryPage(trackCount: Int, includesCatalog: Bool = false) -> String {
         let names = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"]
         let tracks = (1...max(1, min(trackCount, names.count))).map { n in
             #"{"id":"fixture-track-\#(n)","file":"track\#(n).wav","title":"Fixture \#(names[n - 1])","artist":"Fixture Artist","artists":["Fixture Artist"],"album":"Fixture Album","album_artist":"Fixture Artist","album_id":"fixture-album","artist_id":"fixture-artist","track_number":\#(n),"year":"2026","duration":30,"codec":"wav","bitrate":64000,"sample_rate":8000,"channels":1,"size":240044,"added":\#(n),"has_cover":true,"explicit":false,"playlists":[]}"#
         }
-        return #"{"cursor":1,"full":true,"deleted":[],"tracks":["# + tracks.joined(separator: ",") + #"]}"#
+        let catalog = #"{"id":"fixture-catalog-track","file":"catalog.wav","title":"Fixture Catalog Song","artist":"Fixture Artist","artists":["Fixture Artist"],"album":"Fixture Album","album_artist":"Fixture Artist","album_id":"fixture-album","artist_id":"fixture-artist","track_number":1,"year":"2026","duration":30,"codec":"wav","bitrate":64000,"sample_rate":8000,"channels":1,"size":240044,"added":20,"has_cover":true,"explicit":false,"playlists":[]}"#
+        return #"{"cursor":1,"full":true,"deleted":[],"tracks":["# + (tracks + (includesCatalog ? [catalog] : [])).joined(separator: ",") + #"]}"#
     }
     static let libraryPage = libraryPage(trackCount: 2)
 

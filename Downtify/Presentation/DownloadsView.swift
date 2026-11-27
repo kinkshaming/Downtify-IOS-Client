@@ -90,23 +90,27 @@ struct DownloadsView: View {
             HStack(alignment: .top) {
                 NowPlayingReader { nowPlaying in
                     let isCurrent = nowPlaying.isCurrent(item.track)
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            if isCurrent { NowPlayingBadge(isPlaying: nowPlaying.isPlaying) }
-                            Text(item.track.displayTitle).font(.headline).lineLimit(2)
-                                .foregroundStyle(isCurrent ? AnyShapeStyle(palette.accent) : AnyShapeStyle(.primary))
+                    if item.state == .ready {
+                        Button { playReadyDownload(item.id) } label: {
+                            localRowContent(item, isCurrent: isCurrent, isPlaying: nowPlaying.isPlaying)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .contentShape(Rectangle())
                         }
-                        Text(item.track.displayArtist).font(.subheadline).foregroundStyle(DowntifyStyle.secondaryText)
-                        Text(localStatus(item)).font(.caption).foregroundStyle(DowntifyStyle.secondaryText)
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Play \(item.track.displayTitle) by \(item.track.displayArtist)")
+                        .accessibilityIdentifier("downloads.play.\(item.track.id)")
+                        .downtifyCurrentRowAccessibility(isCurrent: isCurrent, isPlaying: nowPlaying.isPlaying)
+                    } else {
+                        localRowContent(item, isCurrent: isCurrent, isPlaying: nowPlaying.isPlaying)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .accessibilityElement(children: .combine)
+                            .downtifyCurrentRowAccessibility(isCurrent: isCurrent, isPlaying: nowPlaying.isPlaying)
                     }
-                    .accessibilityElement(children: .combine)
-                    .downtifyCurrentRowAccessibility(isCurrent: isCurrent, isPlaying: nowPlaying.isPlaying)
                 }
-                Spacer(minLength: 8)
                 Menu {
                     if item.state == .ready {
                         Button("Play", systemImage: "play.fill") {
-                            playback.replaceQueue([item.track], startingAt: 0)
+                            playReadyDownload(item.id)
                         }
                         Button("Remove from Device", systemImage: "trash", role: .destructive) {
                             do { try downloads.delete(item.id); localError = nil }
@@ -128,6 +132,7 @@ struct DownloadsView: View {
                     Image(systemName: "ellipsis.circle").font(.title3).frame(minWidth: 44, minHeight: 44)
                 }
                 .accessibilityLabel("Actions for \(item.track.displayTitle)")
+                .accessibilityIdentifier("downloads.actions.\(item.track.id)")
             }
             if item.state == .transferring, let expected = item.expectedBytes, expected > 0 {
                 ProgressView(value: Double(item.receivedBytes), total: Double(expected))
@@ -139,6 +144,23 @@ struct DownloadsView: View {
         }
         .padding(.vertical, 6)
         .accessibilityElement(children: .contain)
+    }
+
+    private func localRowContent(_ item: OfflineDownload, isCurrent: Bool, isPlaying: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                if isCurrent { NowPlayingBadge(isPlaying: isPlaying) }
+                Text(item.track.displayTitle).font(.headline).lineLimit(2)
+                    .foregroundStyle(isCurrent ? AnyShapeStyle(palette.accent) : AnyShapeStyle(.primary))
+            }
+            Text(item.track.displayArtist).font(.subheadline).foregroundStyle(DowntifyStyle.secondaryText)
+            Text(localStatus(item)).font(.caption).foregroundStyle(DowntifyStyle.secondaryText)
+        }
+    }
+
+    private func playReadyDownload(_ id: UUID) {
+        guard let current = downloads.currentDownloads.first(where: { $0.id == id }), current.state == .ready else { return }
+        playback.replaceQueue([current.track], startingAt: 0)
     }
 
     private var serverSection: some View {

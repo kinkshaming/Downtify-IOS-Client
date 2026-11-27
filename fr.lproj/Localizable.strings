@@ -204,6 +204,7 @@
 "Shared with me" = "Partagés avec moi";
 "Showing saved music." = "Affichage de la musique enregistrée.";
 "Shuffle" = "Aléatoire";
+"Shuffle Library" = "Lire la bibliothèque en aléatoire";
 "Shuffle songs" = "Lire les titres en aléatoire";
 "Sign in to play this track" = "Connectez-vous pour lire ce titre";
 "Sign in with password" = "Se connecter avec un mot de passe";
@@ -651,3 +652,12 @@
 "instrumental break" = "passage instrumental";
 "Loading more…" = "Chargement…";
 "No more similar tracks" = "Plus de titres similaires";
+
+/* Now Playing library requests */
+"This song cannot be requested from the catalog." = "Ce morceau ne peut pas être demandé depuis le catalogue.";
+"Provider information is unavailable for this song." = "Les informations du fournisseur ne sont pas disponibles pour ce morceau.";
+"Catalog requests are unavailable on this server." = "Les demandes au catalogue ne sont pas disponibles sur ce serveur.";
+"Requested for Library" = "Demandé pour la bibliothèque";
+"%@ was requested for your Library" = "%@ a été demandé pour votre bibliothèque";
+"The song will appear after library sync." = "Le morceau apparaîtra après la synchronisation de la bibliothèque.";
+"Check Library requests for the current status." = "Consultez les demandes de bibliothèque pour connaître leur état actuel.";

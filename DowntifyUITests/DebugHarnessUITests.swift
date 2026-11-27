@@ -45,6 +45,7 @@ final class DebugHarnessUITests: XCTestCase {
         let libraryTab = app.buttons["Your Library"].firstMatch
         XCTAssertTrue(libraryTab.waitForExistence(timeout: 10))
         libraryTab.tap()
+        XCTAssertTrue(app.buttons["library.shuffle"].waitForExistence(timeout: 10))
         let album = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Fixture Album")).firstMatch
         XCTAssertTrue(album.waitForExistence(timeout: 10))
         album.tap()
@@ -88,6 +89,81 @@ final class DebugHarnessUITests: XCTestCase {
         XCTAssertEqual(playing?.playerVisible, true)
         XCTAssertTrue(DowntifyUITestSupport.element(app, "player.dock").waitForExistence(timeout: 10))
         XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 15) { $0.artworkLoaded })
+    }
+
+    func testLibraryShuffleStartsPlaybackAndUpdatesPlayerShuffleState() throws {
+        let app = DowntifyUITestSupport.launch(fixtureTracks: 4)
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.sessionActive && $0.libraryTrackCount == 4
+        })
+        DowntifyUITestSupport.element(app, "tab.library").tap()
+        let shuffleLibrary = app.buttons["library.shuffle"]
+        XCTAssertTrue(shuffleLibrary.waitForExistence(timeout: 15))
+        XCTAssertTrue(shuffleLibrary.isHittable)
+        shuffleLibrary.tap()
+
+        let playing = try XCTUnwrap(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.playbackPhase == "playing" && $0.queueCount == 4
+        })
+        let expectedTracks = (1...4).map { "fixture-track-\($0)" }
+        XCTAssertEqual(playing.queueTrackIDs.sorted(), expectedTracks)
+        XCTAssertEqual(playing.queueTrackIDs.first, playing.currentTrackID)
+
+        DowntifyUITestSupport.element(app, "player.dock").tap()
+        let playerShuffle = app.buttons["Shuffle"].firstMatch
+        XCTAssertTrue(playerShuffle.waitForExistence(timeout: 15))
+        if !playerShuffle.isHittable { app.swipeUp() }
+        XCTAssertEqual(playerShuffle.value as? String, "On")
+        playerShuffle.tap()
+        XCTAssertEqual(playerShuffle.value as? String, "Off")
+        let afterToggle = try XCTUnwrap(DowntifyUITestSupport.state(of: app))
+        XCTAssertEqual(afterToggle.currentTrackID, playing.currentTrackID)
+        XCTAssertEqual(afterToggle.playbackPhase, "playing")
+        XCTAssertEqual(afterToggle.queueTrackIDs.sorted(), expectedTracks)
+    }
+
+    /// Issue 97: ready download rows play independently from their actions menus.
+    func testReadyDownloadRowsPlayAndKeepMenuIndependent() throws {
+        let app = DowntifyUITestSupport.launch(fixtureReadyDownloads: true)
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.sessionActive && $0.libraryTrackCount == 2
+        })
+
+        let downloaded = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Downloaded to this device")).firstMatch
+        XCTAssertTrue(downloaded.waitForExistence(timeout: 15))
+        downloaded.tap()
+
+        let first = app.buttons["downloads.play.fixture-track-1"]
+        let second = app.buttons["downloads.play.fixture-track-2"]
+        XCTAssertTrue(first.waitForExistence(timeout: 15))
+        XCTAssertTrue(second.waitForExistence(timeout: 15))
+        XCTAssertTrue(first.label.contains("Fixture One"))
+        XCTAssertTrue(second.label.contains("Fixture Two"))
+
+        first.tap()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.currentTrackID == "fixture-track-1" && $0.playbackPhase == "playing" &&
+            $0.queueTrackIDs == ["fixture-track-1"]
+        })
+        second.tap()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.currentTrackID == "fixture-track-2" && $0.playbackPhase == "playing" &&
+            $0.queueTrackIDs == ["fixture-track-2"]
+        })
+
+        let firstActions = app.buttons["downloads.actions.fixture-track-1"]
+        XCTAssertTrue(firstActions.waitForExistence(timeout: 10))
+        firstActions.tap()
+        let play = app.buttons["Play"].firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 10))
+        let whileMenuOpen = DowntifyUITestSupport.state(of: app)
+        XCTAssertEqual(whileMenuOpen?.currentTrackID, "fixture-track-2")
+        XCTAssertEqual(whileMenuOpen?.queueTrackIDs, ["fixture-track-2"])
+        play.tap()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.currentTrackID == "fixture-track-1" && $0.playbackPhase == "playing" &&
+            $0.queueTrackIDs == ["fixture-track-1"]
+        })
     }
 
     /// Scenario 2: controlled failure. A stream fault must surface as a failed phase with an error code.
@@ -198,6 +274,99 @@ final class DebugHarnessUITests: XCTestCase {
         XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) { $0.currentTrackID == "fixture-track-1" })
         XCTAssertTrue(waitForLabel(of: upNext, toBe: "Nothing up next"), "up next label: \(upNext.label)")
         XCTAssertFalse(app.buttons["Next track"].firstMatch.isEnabled)
+    }
+
+    /// Issue 100: the catalog song has a direct server-library action in Now Playing.
+    func testCatalogNowPlayingOffersLibraryRequestAndFailureRetry() throws {
+        let app = DowntifyUITestSupport.launch()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.sessionActive && $0.libraryTrackCount == 2
+        })
+        let search = app.buttons["Search"].firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        search.tap()
+        let field = app.textFields["catalog.searchField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        field.typeText("Fixture Catalog\n")
+
+        let result = app.buttons["catalog.result.youtube:fixture-song-1"]
+        XCTAssertTrue(result.waitForExistence(timeout: 15))
+        result.tap()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) { $0.playbackPhase == "playing" })
+        let dock = DowntifyUITestSupport.element(app, "player.dock")
+        XCTAssertTrue(dock.waitForExistence(timeout: 10))
+        dock.tap()
+
+        let add = app.buttons["player.addToLibrary"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForEnabled(add))
+        XCTAssertEqual(add.label, "Add Fixture Catalog Song to Library")
+        XCTAssertFalse(app.buttons["player.like"].isEnabled)
+        XCTAssertFalse(app.buttons["player.addToPlaylist"].isEnabled)
+
+        // The fixture returns 404 for the request; this tests the visible failure path,
+        // not a successful server queue or library sync.
+        add.tap()
+        XCTAssertTrue(waitForLabel(of: add, toBe: "Retry adding Fixture Catalog Song to Library"),
+                      "request action label: \(add.label)")
+        XCTAssertTrue(add.isEnabled)
+        XCTAssertFalse(app.buttons["player.like"].isEnabled)
+        XCTAssertFalse(app.buttons["player.addToPlaylist"].isEnabled)
+    }
+
+    /// Issue 100: a queued server request becomes owned only after a library refresh.
+    func testCatalogNowPlayingRequestEnablesActionsAfterLibrarySync() throws {
+        let app = DowntifyUITestSupport.launch(fixtureLibraryRequest: true)
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.sessionActive && $0.libraryTrackCount == 2
+        })
+        let search = app.buttons["Search"].firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        search.tap()
+        let field = app.textFields["catalog.searchField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        field.typeText("Fixture Catalog\n")
+        let result = app.buttons["catalog.result.youtube:fixture-song-1"]
+        XCTAssertTrue(result.waitForExistence(timeout: 15))
+        result.tap()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) { $0.playbackPhase == "playing" })
+        let dock = DowntifyUITestSupport.element(app, "player.dock")
+        XCTAssertTrue(dock.waitForExistence(timeout: 10))
+        dock.tap()
+
+        let add = app.buttons["player.addToLibrary"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForEnabled(add))
+        add.tap()
+        XCTAssertTrue(waitForLabel(of: add, toBe: "Fixture Catalog Song is queued for your Library"),
+                      "request action label: \(add.label)")
+        XCTAssertFalse(add.isEnabled)
+        XCTAssertFalse(app.buttons["player.like"].isEnabled)
+        XCTAssertFalse(app.buttons["player.addToPlaylist"].isEnabled)
+
+        // The fixture changes its library feed after accepting the request. Trigger
+        // the same refresh a listener can use rather than treating queueing as ownership.
+        app.navigationBars["Now Playing"].buttons["Done"].tap()
+        DowntifyUITestSupport.element(app, "tab.library").tap()
+        let account = app.buttons["Account options"].firstMatch
+        XCTAssertTrue(account.waitForExistence(timeout: 10))
+        account.tap()
+        let refresh = app.buttons["Refresh library"].firstMatch
+        XCTAssertTrue(refresh.waitForExistence(timeout: 10))
+        refresh.tap()
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) { $0.libraryTrackCount == 3 })
+
+        let refreshedDock = DowntifyUITestSupport.element(app, "player.dock")
+        XCTAssertTrue(refreshedDock.waitForExistence(timeout: 10))
+        refreshedDock.tap()
+        let owned = app.buttons["player.addToLibrary"]
+        XCTAssertTrue(waitForLabel(of: owned, toBe: "Fixture Catalog Song is in your Library"),
+                      "library action label: \(owned.label)")
+        XCTAssertFalse(owned.isEnabled)
+        XCTAssertTrue(waitForEnabled(app.buttons["player.like"]))
+        XCTAssertTrue(waitForEnabled(app.buttons["player.addToPlaylist"]))
     }
 
     private func waitForEnabled(_ element: XCUIElement, timeout: TimeInterval = 15) -> Bool {

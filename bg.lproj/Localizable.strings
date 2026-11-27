@@ -204,6 +204,7 @@
 "Shared with me" = "Споделени с мен";
 "Showing saved music." = "Показва се запазената музика.";
 "Shuffle" = "Разбъркване";
+"Shuffle Library" = "Разбъркване на библиотеката";
 "Shuffle songs" = "Разбъркване на песни";
 "Sign in to play this track" = "Влезте, за да слушате тази песен";
 "Sign in with password" = "Вход с парола";
@@ -651,3 +652,12 @@
 "instrumental break" = "инструментален откъс";
 "Loading more…" = "Зареждане на още…";
 "No more similar tracks" = "Няма повече подобни песни";
+
+/* Now Playing library requests */
+"This song cannot be requested from the catalog." = "Тази песен не може да бъде заявена от каталога.";
+"Provider information is unavailable for this song." = "Няма информация за доставчика на тази песен.";
+"Catalog requests are unavailable on this server." = "Заявките към каталога не са достъпни на този сървър.";
+"Requested for Library" = "Заявена за библиотеката";
+"%@ was requested for your Library" = "%@ е заявена за вашата библиотека";
+"The song will appear after library sync." = "Песента ще се появи след синхронизиране на библиотеката.";
+"Check Library requests for the current status." = "Проверете заявките за библиотеката за текущото състояние.";

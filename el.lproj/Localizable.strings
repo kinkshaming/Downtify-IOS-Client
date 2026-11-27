@@ -204,6 +204,7 @@
 "Shared with me" = "Κοινόχρηστα με εμένα";
 "Showing saved music." = "Εμφάνιση αποθηκευμένης μουσικής.";
 "Shuffle" = "Τυχαία σειρά";
+"Shuffle Library" = "Τυχαία σειρά βιβλιοθήκης";
 "Shuffle songs" = "Τυχαία αναπαραγωγή τραγουδιών";
 "Sign in to play this track" = "Συνδεθείτε για αναπαραγωγή αυτού του τραγουδιού";
 "Sign in with password" = "Σύνδεση με κωδικό πρόσβασης";
@@ -651,3 +652,12 @@
 "instrumental break" = "οργανικό μέρος";
 "Loading more…" = "Φόρτωση περισσότερων…";
 "No more similar tracks" = "Δεν υπάρχουν άλλα παρόμοια τραγούδια";
+
+/* Now Playing library requests */
+"This song cannot be requested from the catalog." = "Δεν είναι δυνατή η υποβολή αιτήματος για αυτό το τραγούδι από τον κατάλογο.";
+"Provider information is unavailable for this song." = "Δεν υπάρχουν διαθέσιμες πληροφορίες παρόχου για αυτό το τραγούδι.";
+"Catalog requests are unavailable on this server." = "Τα αιτήματα καταλόγου δεν είναι διαθέσιμα σε αυτόν τον διακομιστή.";
+"Requested for Library" = "Ζητήθηκε για τη βιβλιοθήκη";
+"%@ was requested for your Library" = "Υποβλήθηκε αίτημα για το %@ στη βιβλιοθήκη σας";
+"The song will appear after library sync." = "Το τραγούδι θα εμφανιστεί μετά τον συγχρονισμό της βιβλιοθήκης.";
+"Check Library requests for the current status." = "Ελέγξτε τα αιτήματα βιβλιοθήκης για την τρέχουσα κατάσταση.";
