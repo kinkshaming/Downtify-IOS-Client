@@ -11,6 +11,7 @@ Changes:
 - Request Add to Library for eligible catalog songs directly from Now Playing; show request status and enable library-dependent actions after library sync confirms the song (#100)
 - Localize the new Now Playing library-request messages and add fixture coverage for Downloads row playback and library-request states (#97, #100)
 - Tap Shuffle Library to play the full music library in random order from either theme. Now Playing shows Shuffle as on, and turning it off keeps the current song playing (#104)
+- On iPad, open Now Playing beside the app in wide windows so you can browse while controlling playback; narrow windows use a sheet (#99)
 
 ## 0.1.2 (14) — 2026-11-25
 
