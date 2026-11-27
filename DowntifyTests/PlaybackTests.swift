@@ -287,6 +287,56 @@ final class PlaybackTests: XCTestCase {
     }
 
     @MainActor
+    func testLibraryShufflePersistsShuffledQueueAndKeepsTrackWhenToggledOff() async {
+        let fixture = PlaybackFixture()
+        let tracks = ["first", "second", "third"].map { track($0) }
+        await fixture.controller.updateSession(deviceSession()) { tracks }
+        fixture.controller.setRepeat(.all)
+
+        for initialShuffle in [false, true] {
+            fixture.controller.replaceQueue([tracks[0]], autoplay: false)
+            fixture.controller.setShuffle(initialShuffle)
+            fixture.controller.shuffleLibrary(tracks)
+
+            let queue = fixture.controller.queue
+            XCTAssertNotNil(queue.shuffledIDs)
+            XCTAssertEqual(queue.order.compactMap { $0.item.libraryTrack?.id }.sorted(), tracks.map(\.id).sorted())
+            XCTAssertEqual(queue.order.first?.id, queue.currentID)
+            XCTAssertEqual(queue.repeatMode, .all)
+            let saved = fixture.store.load(for: scope)
+            XCTAssertNotNil(saved)
+            XCTAssertEqual(saved?.currentID, queue.currentID)
+            XCTAssertEqual(saved?.shuffledIDs, queue.shuffledIDs)
+
+            fixture.controller.setShuffle(false)
+            XCTAssertEqual(fixture.controller.queue.order.compactMap { $0.item.libraryTrack?.id }, tracks.map(\.id))
+            XCTAssertEqual(fixture.controller.queue.currentID, queue.currentID)
+        }
+    }
+
+    @MainActor
+    func testLibraryShuffleLeavesQueueAloneWhenEmptyAndStartsSingleTrack() async {
+        let fixture = PlaybackFixture()
+        let existing = track("existing")
+        let onlyTrack = track("only")
+        await fixture.controller.updateSession(deviceSession()) { [existing, onlyTrack] }
+        fixture.controller.replaceQueue([existing], autoplay: false)
+
+        let existingID = fixture.controller.queue.currentID
+        fixture.controller.shuffleLibrary([])
+        XCTAssertEqual(fixture.controller.queue.currentID, existingID)
+        XCTAssertNil(fixture.controller.queue.shuffledIDs)
+        XCTAssertEqual(fixture.controller.phase, .paused)
+
+        let started = expectation(description: "Single track starts")
+        fixture.engine.onPlay = { started.fulfill() }
+        fixture.controller.shuffleLibrary([onlyTrack])
+        await fulfillment(of: [started], timeout: 3)
+        XCTAssertEqual(fixture.controller.queue.current?.track, onlyTrack)
+        XCTAssertEqual(fixture.controller.queue.shuffledIDs, fixture.controller.queue.order.map(\.id))
+    }
+
+    @MainActor
     func testNetworkQualityChangeResumesAtSamePositionAndInterruptionHonorsPause() async throws {
         let fixture = PlaybackFixture()
         await fixture.controller.updateSession(deviceSession()) { [] }

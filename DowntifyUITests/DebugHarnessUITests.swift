@@ -45,6 +45,7 @@ final class DebugHarnessUITests: XCTestCase {
         let libraryTab = app.buttons["Your Library"].firstMatch
         XCTAssertTrue(libraryTab.waitForExistence(timeout: 10))
         libraryTab.tap()
+        XCTAssertTrue(app.buttons["library.shuffle"].waitForExistence(timeout: 10))
         let album = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Fixture Album")).firstMatch
         XCTAssertTrue(album.waitForExistence(timeout: 10))
         album.tap()
@@ -88,6 +89,37 @@ final class DebugHarnessUITests: XCTestCase {
         XCTAssertEqual(playing?.playerVisible, true)
         XCTAssertTrue(DowntifyUITestSupport.element(app, "player.dock").waitForExistence(timeout: 10))
         XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 15) { $0.artworkLoaded })
+    }
+
+    func testLibraryShuffleStartsPlaybackAndUpdatesPlayerShuffleState() throws {
+        let app = DowntifyUITestSupport.launch(fixtureTracks: 4)
+        XCTAssertNotNil(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.sessionActive && $0.libraryTrackCount == 4
+        })
+        DowntifyUITestSupport.element(app, "tab.library").tap()
+        let shuffleLibrary = app.buttons["library.shuffle"]
+        XCTAssertTrue(shuffleLibrary.waitForExistence(timeout: 15))
+        XCTAssertTrue(shuffleLibrary.isHittable)
+        shuffleLibrary.tap()
+
+        let playing = try XCTUnwrap(DowntifyUITestSupport.waitForState(app, timeout: 30) {
+            $0.playbackPhase == "playing" && $0.queueCount == 4
+        })
+        let expectedTracks = (1...4).map { "fixture-track-\($0)" }
+        XCTAssertEqual(playing.queueTrackIDs.sorted(), expectedTracks)
+        XCTAssertEqual(playing.queueTrackIDs.first, playing.currentTrackID)
+
+        DowntifyUITestSupport.element(app, "player.dock").tap()
+        let playerShuffle = app.buttons["Shuffle"].firstMatch
+        XCTAssertTrue(playerShuffle.waitForExistence(timeout: 15))
+        if !playerShuffle.isHittable { app.swipeUp() }
+        XCTAssertEqual(playerShuffle.value as? String, "On")
+        playerShuffle.tap()
+        XCTAssertEqual(playerShuffle.value as? String, "Off")
+        let afterToggle = try XCTUnwrap(DowntifyUITestSupport.state(of: app))
+        XCTAssertEqual(afterToggle.currentTrackID, playing.currentTrackID)
+        XCTAssertEqual(afterToggle.playbackPhase, "playing")
+        XCTAssertEqual(afterToggle.queueTrackIDs.sorted(), expectedTracks)
     }
 
     /// Issue 97: ready download rows play independently from their actions menus.
