@@ -4,7 +4,13 @@ Historical record of Downtify iOS releases (version 0.1.2), newest first. Each b
 
 Builds 0.1.2-7 and earlier predate the curated release notes; their entries are reconstructed from git history.
 
-## Unreleased — 0.1.2-15 branch
+## 0.1.2 (15) — 2026-11-26
+
+Release notes:
+- Tap a downloaded song to play it right away
+- Add a catalog song to your library straight from Now Playing
+- Shuffle your whole library with Shuffle Library
+- On iPad, Now Playing opens beside your library in wide windows
 
 Changes:
 - Play a ready download by tapping its row; its separate actions menu keeps Play and device-management controls (#97)
@@ -12,6 +18,11 @@ Changes:
 - Localize the new Now Playing library-request messages and add fixture coverage for Downloads row playback and library-request states (#97, #100)
 - Tap Shuffle Library to play the full music library in random order from either theme. Now Playing shows Shuffle as on, and turning it off keeps the current song playing (#104)
 - On iPad, open Now Playing beside the app in wide windows so you can browse while controlling playback; narrow windows use a sheet (#99)
+
+Released from #106.
+
+Contributors:
+- Michael Moskie (@michaelmoskie)
 
 ## 0.1.2 (14) — 2026-11-25
 
