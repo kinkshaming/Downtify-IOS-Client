@@ -24,15 +24,56 @@ struct AppShellView: View {
                                connection: presentation.connectionService, discovery: presentation.serverDiscovery,
                                deviceName: name)
             case let .library(server):
-                LibraryHomeView(server: server, library: library, playback: playback, appearance: $appearance,
-                                connection: presentation.connectionService, serverDownloadQueue: serverDownloadQueue,
-                                serverDownloads: serverDownloads,
-                                signOut: { try await presentation.connectionService.signOut() })
+                PlayerPanelContainer(playback: playback, library: library, serverDownloads: serverDownloads) {
+                    LibraryHomeView(server: server, library: library, playback: playback, appearance: $appearance,
+                                    connection: presentation.connectionService, serverDownloadQueue: serverDownloadQueue,
+                                    serverDownloads: serverDownloads,
+                                    signOut: { try await presentation.connectionService.signOut() })
+                }
             }
         }
         .downtifyAppearance(appearance, theme: try? DowntifyTheme.decode(Data(themeJSON.utf8)))
         .environment(\.locale, Locale(identifier: language == "system" ? Locale.current.identifier : language))
         .task { presentation.start(); library.start() }
+    }
+}
+
+private struct OpenPlayerPanelKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+
+private extension EnvironmentValues {
+    var openPlayerPanel: (() -> Void)? {
+        get { self[OpenPlayerPanelKey.self] }
+        set { self[OpenPlayerPanelKey.self] = newValue }
+    }
+}
+
+private struct PlayerPanelContainer<Content: View>: View {
+    let playback: PlaybackController
+    let library: LibraryPresentationModel
+    let serverDownloads: ServerDownloadPresentationModel
+    @ViewBuilder let content: () -> Content
+    @State private var showingPlayer = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            let canShowPanel = UIDevice.current.userInterfaceIdiom == .pad && geometry.size.width >= 600
+            HStack(spacing: 0) {
+                content()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .environment(\.openPlayerPanel, canShowPanel ? { showingPlayer = true } : nil)
+                if canShowPanel && showingPlayer {
+                    Divider()
+                    NowPlayingView(playback: playback, library: library, serverDownloads: serverDownloads,
+                                   close: { showingPlayer = false })
+                        .frame(width: min(420, max(280, geometry.size.width * 0.42)))
+                }
+            }
+            .onChange(of: canShowPanel) { _, available in
+                if !available { showingPlayer = false }
+            }
+        }
     }
 }
 
@@ -135,12 +176,15 @@ struct PlaybackDock: View {
     /// Measured height of the visible dock; 0 while it is hidden.
     @Binding var height: CGFloat
     @Environment(\.downtifyPalette) private var palette
+    @Environment(\.openPlayerPanel) private var openPlayerPanel
     @State private var showingNowPlaying = false
 
     var body: some View {
         Group {
             if playback.podcast != nil || playback.queue.current != nil {
-                MiniPlayerView(playback: playback) { showingNowPlaying = true }
+                MiniPlayerView(playback: playback) {
+                    if let openPlayerPanel { openPlayerPanel() } else { showingNowPlaying = true }
+                }
                     .frame(maxWidth: 760)
                     .padding(.horizontal, DowntifyStyle.Space.regular)
                     .padding(.vertical, DowntifyStyle.Space.small)
@@ -158,7 +202,8 @@ struct PlaybackDock: View {
             }
         }
         .sheet(isPresented: $showingNowPlaying) {
-            NowPlayingView(playback: playback, library: library, serverDownloads: serverDownloads)
+            NowPlayingView(playback: playback, library: library, serverDownloads: serverDownloads,
+                           close: { showingNowPlaying = false })
                 .presentationDragIndicator(.visible)
         }
     }
@@ -251,10 +296,26 @@ extension EnvironmentValues {
     }
 }
 
+/// Resolves placement from the sheet's available space, including split view and rotation.
+struct NowPlayingLayout {
+    let size: CGSize
+    let isAccessibilitySize: Bool
+
+    var isWide: Bool {
+        !isAccessibilitySize && size.width >= 500
+    }
+
+    func artworkSize(redesigned: Bool) -> CGFloat {
+        let preferred: CGFloat = isWide ? 200 : (isAccessibilitySize ? 172 : (redesigned ? 360 : 240))
+        return max(0, min(preferred, size.width - 2 * DowntifyStyle.Space.regular))
+    }
+}
+
 private struct NowPlayingView: View {
     @ObservedObject var playback: PlaybackController
     @ObservedObject var library: LibraryPresentationModel
     @ObservedObject var serverDownloads: ServerDownloadPresentationModel
+    let close: () -> Void
     @State private var path: [NowPlayingRoute] = []
     @State private var artistChoices: [NowPlayingArtistTarget] = []
     @EnvironmentObject private var collections: LibraryCollectionsModel
@@ -267,9 +328,7 @@ private struct NowPlayingView: View {
     @State private var confirmationCount = 0
     @AppStorage("debug.networkOverlay.enabled") private var networkOverlayEnabled = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.downtifyPalette) private var palette
-    @Environment(\.dismiss) private var dismiss
     @State private var showingQueue = false
     @State private var lyrics: TrackLyrics?
     @State private var lyricsLoading = false
@@ -292,20 +351,17 @@ private struct NowPlayingView: View {
     private var upNext: UpNextSummary? { UpNextSummary(queue: playback.queue) }
     private var activelyPlaying: Bool { playback.phase == .playing || playback.phase == .buffering || playback.phase == .loading }
 
-    private var usesWideLayout: Bool {
-        horizontalSizeClass == .regular && !dynamicTypeSize.isAccessibilitySize
-    }
-
     var body: some View {
         NavigationStack(path: $path) {
             ZStack(alignment: .topTrailing) {
             GeometryReader { geometry in
             ScrollView {
-                let imageSize = palette.redesign("player") && !usesWideLayout && !dynamicTypeSize.isAccessibilitySize
-                    ? min(max(geometry.size.width - 48, 100), 360) : artworkSize
-                let layout = usesWideLayout
-                    ? AnyLayout(HStackLayout(alignment: .center, spacing: DowntifyStyle.Space.large))
+                let placement = NowPlayingLayout(size: geometry.size, isAccessibilitySize: dynamicTypeSize.isAccessibilitySize)
+                let imageSize = placement.artworkSize(redesigned: palette.redesign("player"))
+                let layout = placement.isWide
+                    ? AnyLayout(HStackLayout(alignment: .top, spacing: DowntifyStyle.Space.large))
                     : AnyLayout(VStackLayout(spacing: DowntifyStyle.Space.large))
+                VStack(spacing: DowntifyStyle.Space.regular) {
                 layout {
                     Group {
                         if let podcast = playback.podcast {
@@ -328,9 +384,6 @@ private struct NowPlayingView: View {
                         transportControls
                         if playback.podcast == nil {
                             actionRow
-                            queueControls
-                            upNextCard
-                            if track != nil { lyricsSection }
                         } else {
                             if playback.podcastProgressSaveFailed {
                                 Text("Could not save playback progress to the server.")
@@ -343,6 +396,15 @@ private struct NowPlayingView: View {
                         }
                     }
                     .frame(maxWidth: 400)
+                }
+                if playback.podcast == nil {
+                    VStack(spacing: DowntifyStyle.Space.regular) {
+                        queueControls
+                        upNextCard
+                        if track != nil { lyricsSection }
+                    }
+                    .frame(maxWidth: 600)
+                }
                 }
                 .padding(DowntifyStyle.Space.regular)
                 .frame(maxWidth: 760)
@@ -366,7 +428,7 @@ private struct NowPlayingView: View {
             .toolbarBackground(palette.background, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done") { close() }
                 }
             }
             .navigationDestination(for: NowPlayingRoute.self) { route in
@@ -383,7 +445,7 @@ private struct NowPlayingView: View {
                 .toolbarBackground(palette.background, for: .navigationBar)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { dismiss() }
+                        Button("Done") { close() }
                     }
                 }
             }
@@ -798,11 +860,6 @@ private struct NowPlayingView: View {
         case .all: "All"
         case .one: "One"
         }
-    }
-
-    private var artworkSize: CGFloat {
-        if usesWideLayout { return 200 }
-        return dynamicTypeSize.isAccessibilitySize ? 172 : 240
     }
 
     private var lyricsSection: some View {

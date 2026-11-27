@@ -9,6 +9,22 @@ final class DebugHarnessTests: XCTestCase {
     private let harnessArgs = ["-DowntifyHarness"]
     private let stagingArgs = ["-DowntifyHarness", "-DowntifyHarnessMode", "staging"]
 
+    func testNowPlayingPlacementAdaptsToAvailableSpace() {
+        func placement(_ width: CGFloat, _ height: CGFloat, accessibility: Bool = false) -> NowPlayingLayout {
+            NowPlayingLayout(size: CGSize(width: width, height: height), isAccessibilitySize: accessibility)
+        }
+        XCTAssertTrue(placement(768, 1024).isWide) // iPad portrait
+        XCTAssertTrue(placement(1024, 768).isWide) // iPad landscape
+        XCTAssertFalse(placement(400, 768).isWide) // narrow split view
+        XCTAssertTrue(placement(500, 600).isWide)
+        XCTAssertFalse(placement(1024, 768, accessibility: true).isWide)
+        XCTAssertEqual(placement(768, 1024).artworkSize(redesigned: true), 200)
+        XCTAssertEqual(placement(390, 844).artworkSize(redesigned: true), 358)
+        XCTAssertEqual(placement(1024, 768).artworkSize(redesigned: true), 200)
+        XCTAssertEqual(placement(200, 400).artworkSize(redesigned: true), 168)
+        XCTAssertEqual(placement(768, 1024, accessibility: true).artworkSize(redesigned: false), 172)
+    }
+
     /// The example themes in docs/theme-examples must stay valid, and full.json must show every field.
     func testDocumentedExampleThemesDecodeAndCoverEveryField() throws {
         let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
