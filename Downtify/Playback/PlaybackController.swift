@@ -364,9 +364,16 @@ final class PlaybackController: ObservableObject {
         replaceQueue(tracks.map(PlaybackItem.library), startingAt: index, autoplay: autoplay)
     }
 
-    func replaceQueue(_ items: [PlaybackItem], startingAt index: Int = 0, autoplay: Bool = true) {
+    func shuffleLibrary(_ tracks: [LibraryTrack]) {
+        guard !tracks.isEmpty else { return }
+        replaceQueue(tracks.map(PlaybackItem.library), startingAt: Int.random(in: tracks.indices), startShuffled: true)
+    }
+
+    func replaceQueue(_ items: [PlaybackItem], startingAt index: Int = 0, autoplay: Bool = true,
+                      startShuffled: Bool = false) {
         cancelAutoplay()
         queue.replace(items, startingAt: index)
+        if startShuffled { queue.setShuffle(true) }
         consecutiveUnplayableFailures = 0
         didSelect(autoplay: autoplay)
     }

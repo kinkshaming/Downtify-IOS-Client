@@ -599,6 +599,13 @@ struct LibraryHomeView: View {
             }
         }
         }
+        Button("Shuffle Library", systemImage: "shuffle") {
+            playback.shuffleLibrary(library.tracks)
+        }
+        .buttonStyle(.bordered)
+        .disabled(library.tracks.isEmpty)
+        .accessibilityIdentifier("library.shuffle")
+
         HStack {
             if category != .playlists { sortMenu }
             Spacer()
